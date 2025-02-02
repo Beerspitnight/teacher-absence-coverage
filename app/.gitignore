@@ -1,6 +1,12 @@
 __pycache__/
 *.log
-venv/
-.venv/
-.env
 node_modules/
+# Ignore virtual environment folders
+venv/
+.env/
+.venv/
+env/
+
+
+app/credentials.json
+app/credentials.json
