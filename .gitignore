@@ -1,0 +1,8 @@
+# Ignore virtual environment folders
+venv/
+.env/
+.venv/
+env/
+__pycache__/
+*.log
+node_modules/
