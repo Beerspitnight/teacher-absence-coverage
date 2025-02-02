@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Manual Absence Entry</title>
+</head>
+<body>
+  <h1>Enter Manual Absence</h1>
+  <form method="POST">
+    <!-- Teacher dropdown -->
+    <label for="teacher_name">Teacher/TA:</label>
+    <select name="teacher_name" id="teacher_name" required>
+      <option value="" disabled selected>Select a teacher</option>
+      {% for name in teacher_names %}
+      <option value="{{ name }}">{{ name }}</option>
+      {% endfor %}
+    </select>
+    <br><br>
+
+    <!-- Duration dropdown (now includes "Period") -->
+    <label for="duration">Duration:</label>
+    <select name="duration" id="duration" required>
+      <option value="" disabled selected>Select duration</option>
+      <option value="Full Day">Full Day</option>
+      <option value="Half Day AM">Half Day AM</option>
+      <option value="Half Day PM">Half Day PM</option>
+      <option value="Period">Period</option>
+    </select>
+    <br><br>
+
+    <!-- Period checkboxes -->
+    <fieldset>
+      <legend>Select Periods (only used if "Period" is selected):</legend>
+      {% for period in period_options %}
+      <input type="checkbox" name="periods" id="period_{{ period }}" value="{{ period }}">
+      <label for="period_{{ period }}">{{ period }}</label>
+      {% endfor %}
+    </fieldset>
+    <br>
+
+    <!-- Substitute name input -->
+    <label for="sub_name">Substitute Name (if any):</label>
+    <input type="text" name="sub_name" id="sub_name">
+    <br><br>
+
+    <button type="submit">Submit Manual Absence</button>
+  </form>
+</body>
+</html>

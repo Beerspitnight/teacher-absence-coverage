@@ -1,0 +1,76 @@
+{\rtf1\ansi\ansicpg1252\cocoartf2761
+\cocoatextscaling0\cocoaplatform0{\fonttbl\f0\fswiss\fcharset0 Helvetica;}
+{\colortbl;\red255\green255\blue255;}
+{\*\expandedcolortbl;;}
+\margl1440\margr1440\vieww12000\viewh14000\viewkind0
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+
+\f0\fs24 \cf0 #manual_load.py\
+import gspread\
+from google.oauth2.service_account import Credentials\
+\
+# Google Sheets authentication setup\
+SERVICE_ACCOUNT_FILE = "credentials.json"\
+SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]\
+\
+def get_gspread_client():\
+    try:\
+        creds = Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=SCOPES)\
+        return gspread.authorize(creds)\
+    except Exception as e:\
+        print(f"\uc0\u10060  Error loading credentials: \{e\}")\
+        raise RuntimeError("Failed to initialize Google Sheets client")\
+\
+# Google Sheets IDs\
+DAILY_COVERAGE_ID = "1vIpDw6erO5dO8IlMfoQlvfSS8fVd76WSaj28uwEZwuk"\
+MASTER_SCHEDULE_ID = "12XNbaa4AvahxYxR7D6Qa6DfrEeZPgrSiTTo5V9uFTsg"\
+\
+FILL_VALUE = "NSN"  # Placeholder for inactive periods\
+\
+\
+def find_teacher_in_master(teacher_name, master_schedule_data):\
+    for row in master_schedule_data:\
+        if row and row[0] == teacher_name:\
+            return row\
+    return None\
+\
+\
+def add_manual_absence(teacher_name, duration, periods, sub_name=""):\
+    """Adds a manual absence entry to the daily_coverage sheet."""\
+    try:\
+        client = get_gspread_client()\
+        daily_coverage_sheet = client.open_by_key(DAILY_COVERAGE_ID).sheet1\
+        master_schedule_sheet = client.open_by_key(MASTER_SCHEDULE_ID).sheet1\
+\
+        master_schedule_data = master_schedule_sheet.get_all_values()\
+        master_row = find_teacher_in_master(teacher_name, master_schedule_data)\
+\
+        if not master_row:\
+            print(f"\uc0\u10060  Teacher \{teacher_name\} not found in master schedule")\
+            return\
+\
+        new_row = [""] * 13\
+        new_row[0] = teacher_name  # Column A\
+\
+        period_mapping = \{\
+            "Full Day": lambda row, new_row: new_row.__setitem__(slice(1, 11), row[1:11]),\
+            "Half Day AM": lambda row, new_row: (new_row.__setitem__(slice(1, 7), row[1:7]), new_row.__setitem__(slice(7, 11), [FILL_VALUE] * 4)),\
+            "Half Day PM": lambda row, new_row: (new_row.__setitem__(slice(1, 6), [FILL_VALUE] * 5), new_row.__setitem__(slice(6, 11), row[6:11])),\
+            "Period": lambda row, new_row: [new_row.__setitem__(i, row[i]) if str(i) in periods else new_row.__setitem__(i, FILL_VALUE) for i in range(1, 11)],\
+        \}\
+\
+        if duration in period_mapping:\
+            period_mapping[duration](master_row, new_row)\
+        else:\
+            print("\uc0\u10060  Invalid duration specified")\
+            return\
+\
+        new_row[11] = sub_name  # Substitute name\
+        new_row[12] = duration  # Duration\
+\
+        daily_coverage_sheet.append_row(new_row, value_input_option='USER_ENTERED')\
+        print(f"\uc0\u9989  Added manual absence for \{teacher_name\}")\
+    except Exception as e:\
+        print(f"\uc0\u10060  Error adding manual absence: \{e\}")\
+        raise\
+}

@@ -1,0 +1,90 @@
+Below is a detailed summary of the project, including the work we’ve completed so far and a list of potential next steps for further improvements.
+
+---
+
+## Project Overview
+
+The goal of this project is to streamline and automate teacher absence tracking and daily coverage updates using Google Sheets as a data hub. The system integrates multiple data sources (such as daily reports and master schedules) and offers both automated and manual methods to update coverage information. The work is divided into several key components:
+
+- **Automated Updates:**  
+  Processing a daily report sheet to match teacher names against a master schedule, then updating a “daily_coverage” Google Sheet with the combined data.
+
+- **Data Cleaning and Formatting:**  
+  Cleaning the “daily_coverage” data—including standardizing teacher names and ensuring that non-teaching blocks (like “Prep”, “Plan/Duty”, “Duty/Plan”, and “Lunch”) are correctly maintained and visually formatted (with a dark gray fill).
+
+- **Manual Data Entry:**  
+  Allowing manual entry of teacher absences via a web interface. This includes a form that leverages a dropdown list for teacher names (sourced directly from a teacher list sheet) and checkboxes for period selection. The form also supports various “duration” options (Full Day, Half Day AM, Half Day PM, or specific Period(s)), applying the appropriate logic to update the daily coverage data.
+
+- **Web Interface Dashboard:**  
+  Integrating the above scripts into a Flask-based dashboard, so that you can trigger the processes from a browser rather than using the terminal. This dashboard provides links or forms for:
+  - Running the automated update (using **update_google_sheets.py**).
+  - Cleaning and formatting the daily coverage data (using **cleandailycov.py**).
+  - Manually adding absence entries (using **manual_load.py**).
+
+- **Code Organization and Callable Functions:**  
+  We refactored the core scripts to include callable `main()` functions. This enables each process (update, cleaning, and manual entry) to be triggered both from the terminal and from the web dashboard. We also confirmed that **process_data.py** is not needed in our workflow, so it can be removed from the project.
+
+---
+
+## Work Completed
+
+1. **update_google_sheets.py:**
+   - Developed a script that reads from a daily report sheet.
+   - Cleans teacher names and substitute names.
+   - Uses fuzzy matching against a master schedule to populate a daily coverage sheet.
+   - Wrapped the entire process in a callable `main()` function for easy integration.
+
+2. **cleandailycov.py:**
+   - Created a script to clean up the daily coverage sheet data.
+   - Standardizes teacher names, cleans substitute names, and applies a rule to replace period values with “sub” when appropriate.
+   - Enhanced the script to apply a dark gray background fill to cells containing specific values (“4”, “Prep”, “Plan/Duty”, “Duty/Plan”, “Lunch”) via the Sheets API batch update.
+   - Exposed a callable `main()` function for integration with a dashboard.
+
+3. **manual_load.py:**
+   - Developed a script that supports manual absence entry.
+   - Integrated enhancements to display teacher names in a dropdown (sourced from a dedicated teacher list sheet) and periods as checkboxes.
+   - Supported multiple “duration” options (Full Day, Half Day AM, Half Day PM, and Period), with logic to fill non-active periods with the dark gray value (currently '4', but we need to change this to a different value. (and later, with the dark gray background).
+   - Integrated this script into a Flask-based web form (in **app.py**) to avoid terminal-based data entry.
+
+4. **Web Interface (Flask Dashboard):**
+   - Built a Flask application that provides:
+     - A dashboard with links to run the update process, clean the daily coverage, and enter manual absences.
+     - HTML templates for the dashboard and manual absence entry form.
+     - Integration with the Google Sheets APIs using service account credentials.
+   - Made sure all core scripts are callable from the web interface (by using their `main()` functions).
+
+5. **Code Cleanup:**
+   - Ensured each major script (update, clean, and manual entry) exposes a callable main function, making integration and future maintenance simpler.
+
+---
+
+## Work to Do (Future Enhancements)
+
+1. **UI/UX Enhancements on the Web Dashboard:**
+   - **Conditional Display:**  
+     Use JavaScript to hide or disable period checkboxes when a “Full Day”, “Half Day AM”, or “Half Day PMdok and better user experience.
+   - **User Feedback:**  
+     Add more detailed flash messages and logging in the web interface to provide clear feedback on successful updates or errors.
+
+2. **Error Handling and Logging:**
+   - Expand error handling across all scripts for better resilience.  
+   - Consider integrating a logging service or saving logs to a file for future troubleshooting.
+
+3. **Deployment Considerations:**
+   - Deploy the Flask web interface to a production environment (e.g., Heroku, Google App Engine, or another hosting provider) so that it can be accessed remotely.
+   - Secure the application (using HTTPS, proper authentication, etc.) if it will be accessed over the internet.
+
+4. **Automation and Scheduling:**
+   - Look into scheduling the automated update processes (e.g., via a cron job or a task scheduler) if the daily reports and master schedules are updated regularly.
+   - Integrate notifications (such as email alerts) in case of errors during the automated processes.
+
+5. **Documentation:**
+   - Create detailed documentation for the entire project, including setup instructions, code structure, and usage guidelines. This will help future maintenance or onboarding of new team members.
+
+---
+
+## Conclusion
+
+We have successfully built an integrated teacher absence tracking system that automates data ingestion from Google Sheets, cleans and formats the data, and provides a user-friendly web interface for manual entries. With the core functionality in place and callable main functions for key processes, the project is now ready for further refinement and deployment. Future work will focus on enhancing the user interface, adding robust error handling and scheduling, and ensuring the system is securely deployed for remote access.
+
+This concludes our work together for now. If you have any additional questions or need further enhancements in the future, feel free to reach out!

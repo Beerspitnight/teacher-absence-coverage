@@ -1,0 +1,52 @@
+Normalization:
+Check for and remove duplicate entries, standardize date/time formats, and ensure that identifiers (like teacher names or IDs) are consistent.
+
+Error Checking:
+Verify that each record in daily_coverage has all the necessary fields (absent teacher, duration, sub, schedule info) and flag any missing or inconsistent data for manual review. - yes, we can flag missing schedules of teachers, or missing teachers by highlighting their names on daily_coverage.  Do not worry about duration or sub as some teachers may not have a sub assigned to them.  And duration is gravy for me, not a need. 
+
+Aggregation/Reconciliation:
+If your data sources (daily report and master schedule) overlap or provide redundant info, design a reconciliation process. This may involve merging records, updating statuses, or computing additional fields (e.g., total coverage duration).
+Yes, we are going to use s2_t_sched as the authoritative schedule.  See additional notes below on requirements for the check/validation
+
+Modular Function:
+Write the cleanup logic as a separate function or module. This will make it easier to test and maintain. For instance, after the initial population of daily_coverage, call a function like clean_daily_coverage() that performs all the necessary checks and formatting.  Sounds good
+
+Additional information on the checking script:
+
+Objective: Develop a sscript to ensure daily sub coverage for absent teachers, focusing only on teaching periods while disregarding non-teaching times (prep, duty, prep/duty, and lunch). The script will utilize teacher schedules from Semester 1 and Semester 2 (s1_t_sched and s2_t_sched) for accuracy and consistency.  We will start with trying to make semester 2 schedule work,.
+
+Key Details:
+	1	Schedule Information:
+	◦	Semester schedules (s1_t_sched and s2_t_sched) are computer-generated and provide detailed data on teaching and non-teaching periods.
+	◦	s2_t_sched is the authoritative schedule.  master_schedule is human created and trys to place co-teachers together (…ICS w?Bergen) and highlights teacher’s prep, duty, prep/duty, and lunch.  
+	◦	Non-teaching periods (prep, duty, prep/duty, and lunch) do not require sub coverage and should be excluded from the analysis.
+	◦	Blacked-out cells marked with "n" indicate no class and must be flagged if incorrectly identified.
+	2	Daily Coverage Sheet Overview:
+	◦	Absent teachers are listed in Column A.
+	◦	Uncovered periods must be flagged:
+	▪	Highlight missing coverage in yellow.
+	▪	Flag blank cells for review.
+	1	Sub Coverage Rules:
+	◦	Classes must be covered either by a substitute from  <first name, last name>, or by a co-teacher (indicated with "w/<Teacher Last Name>").
+	◦	Co-taught classes do not require a sub unless both teachers are absent.
+	2	Wednesday Advisory Periods:
+	◦	Advisory periods are irrelevant for sub coverage and should be disregarded.
+	◦	Add the message "Advisory is Today" at the bottom of the sheet on Wednesdays, using bold red text with a light red background.
+
+Requirements for Script Development:
+	1	Use s1_t_sched and s2_t_sched to identify teaching periods, disregarding non-teaching periods (prep, duty, prep/duty, and lunch).
+	2	Verify daily coverage:
+	◦	Ensure all absent teachers' classes are covered by a sub (from Column L) or a co-teacher.
+	◦	Flag uncovered periods and blank cells.
+	◦	Highlight missing coverage periods in yellow.
+	3	Handle co-teaching scenarios:
+	◦	Sub coverage is only required if both co-teachers are absent.
+	4	Optimize the script for use throughout the year to accommodate changing schedules and co-teaching arrangements.
+	5	Output is 
+	◦	def clean_schedule(file_path):
+	6	    	"""   Cleans the schedule by removing non-teaching periods and preparing it for validation.
+	7	Args: file_path (str): Path to the schedule Excel file.
+	8	 Returns:
+	9	 pd.DataFrame: Cleaned schedule with relevant columns and rows.
+
+

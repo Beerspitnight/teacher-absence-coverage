@@ -1,0 +1,664 @@
+Below is a comprehensive summary of the project, its current functionality, what remains to be done, and detailed descriptions of each script’s role in the overall workflow. This summary is designed so that in any future conversation, all necessary context is provided upfront.
+
+---
+
+## **Project Overview**
+
+**Purpose:**  
+The project is a teacher absence tracking system that automates and streamlines the process of updating daily coverage information using Google Sheets. It integrates automated updates, data cleaning/formatting, and manual absence entries via a web interface. Ultimately, the system serves to ease the administrative burden by ensuring that teacher absences and substitute coverage are accurately reflected in a central Google Sheet.
+
+**Key Functions:**
+- **Automated Update:**  
+  Reads data from a daily report, cleans teacher and substitute names, uses fuzzy matching against a master schedule, and updates a “daily coverage” sheet.
+  
+- **Data Cleaning & Formatting:**  
+  Processes the daily coverage sheet to standardize names, sort data, and apply cell formatting (such as filling certain cells with a dark-gray background). This includes replacing non-active period values with a placeholder.
+  
+- **Manual Absence Entry:**  
+  Provides a web form for entering teacher absences manually. Depending on the absence type (Full Day, Half Day AM, Half Day PM, or specific Periods), the system copies parts of the master schedule into the daily coverage sheet. In cases where a teacher is off only for selected periods, the remaining (inactive) periods are filled with the placeholder `"NSN"` (meaning “no sub needed”).
+
+- **Web Dashboard Interface:**  
+  A centralized Flask-based web application that lets users trigger automated updates, cleaning/formatting, and manual absence entries—all through a user-friendly GUI.
+
+---
+
+## **What the Project Does**
+
+1. **Automated Data Processing:**  
+   - **update_google_sheets.py** reads the daily report, cleans the data, and uses fuzzy matching with the master schedule to populate the daily coverage sheet.
+
+2. **Data Cleaning and Formatting:**  
+   - **cleandailycov.py** loads the daily coverage data into a DataFrame, cleans teacher/substitute names, sorts the data, and applies formatting (such as dark-gray background for specific target values).  
+   - (This functionality is planned to be merged with the web dashboard’s functionality for simplicity.)
+
+3. **Manual Absence Handling:**  
+   - **manual_load.py** supports manual entries where a teacher’s absence is recorded by selecting a duration (Full Day, Half Day AM, Half Day PM, or specific Periods).  
+   - The code sets a placeholder for inactive periods. The requirement is to change the placeholder from `"4"` to `"NSN"` when only specific periods are off (i.e., when not a full or half day).
+
+4. **Centralized Web Interface:**  
+   - **dashboard.py** currently serves as the web dashboard, offering routes for automated updates, cleaning/formatting, and manual absence entry. Flask application.
+
+---
+
+## **What Still Needs to Be Done**
+
+Done - placeholder of 4 was updated to 'NSN' 2/1/25 15:56
+1. **Placeholder Update in Manual Entries:**
+   - Change the filler value from `"4"` to `"NSN"` in the manual absence logic (in **manual_load.py**) so that when a teacher is absent for specific periods, inactive periods are marked as `"NSN"` (meaning “no sub needed”). - I believe I did this.
+
+Done - script functions have been consolidated - 2/1/25 16:28
+2. **Simplify and Consolidate the Web Dashboard:**
+   - **Consolidate Common Functionality:**  
+     Merge the overlapping logic found in **cleandailycov.py** and **dashboard.py** into a shared utility module (for example, **daily_utils.py**).  
+     This module will include:
+     - Functions for reading and cleaning Google Sheets data.
+     - Functions for sorting and updating the daily coverage sheet.
+     - Functions for applying the dark-gray (or updated) cell formatting.
+   
+  
+   - **Centralize the Web Interface:**  
+3. Update **dashboard.py** so that it becomes the single, centralized Flask application. It will import and call the shared functions from **daily_utils.py** rather than duplicating logic.  
+     (The older **app.py** can be retired once all routes and functionalities are confirmed to be present in the new dashboard.)
+
+4. **UI/UX Enhancements:**
+   - Adopt a front-end framework (the recommendation is **Bootstrap** for its ease of integration and robust component library) to improve the look and responsiveness of the web interface.
+   - Implement dynamic form behaviors (e.g., disabling period checkboxes based on duration selection) and clear feedback via flash messages.
+
+5. **Security Enhancements:**
+   - Secure the Flask application by serving it over HTTPS.
+   - Consider adding basic authentication (username/password or similar) to restrict access, even though only 2–3 users will be interacting with the system.
+
+6. **Hosting Decisions:**
+   - Evaluate hosting options (Heroku is recommended for its ease of deployment and robust free tier; Render is a good alternative if fewer cold starts are desired).
+   - Finalize the deployment strategy with attention to secure credential management (using environment variables, for example).
+
+7. **Additional Code Refactoring:**
+   - Remove redundant code from **cleandailycov.py** and **update_google_sheets.py** if applicable by migrating common routines into **daily_utils.py**.
+   - Maintain clear, modular functions to ease future testing and maintenance.
+
+---
+
+## **Script-by-Script Detailed Structure & Workflow**
+
+### **1. update_google_sheets.py**
+- **Purpose:**  
+  Performs the automated update process. It:
+  - Reads the daily report from Google Sheets.
+  - Cleans teacher and substitute names.
+  - Uses fuzzy matching (with a threshold of ~85) to match teachers against the master schedule.
+  - Populates the daily coverage sheet with the teacher’s schedule (including a header row and data rows).
+- **Place in Workflow:**  
+  This script is typically run either manually from the command line or triggered via the web dashboard to keep the daily coverage sheet updated automatically.
+
+### **2. manual_load.py**
+- **Purpose:**  
+  Enables manual entry of teacher absences. Based on the chosen duration (Full Day, Half Day AM, Half Day PM, or specific Periods), it:
+  - Retrieves the teacher’s schedule from the master schedule.
+  - Copies the relevant portions into a new row in the daily coverage sheet.
+  - Fills inactive periods with a placeholder—now updated to `"NSN"` for cases where only specific periods are off.
+- **Place in Workflow:**  
+  This script is linked to a form in the Flask web interface, allowing administrators to manually enter absence data as needed.
+
+### **3. cleandailycov.py**
+- **Purpose:**  
+  Cleans and formats the data in the daily coverage sheet. Its functions include:
+  - Converting the sheet data into a pandas DataFrame.
+  - Cleaning teacher names and substitute names.
+  - Sorting the data so that teachers with valid schedules are prioritized.
+  - Applying a dark-gray background to specific cells (e.g., those marked with “Prep”, “Plan/Duty”, “NSN”, etc.).
+- **Place in Workflow:**  
+  Originally a standalone script for cleaning data, its core functionality will be merged into a shared module (daily_utils.py) to be called by the central dashboard.
+
+### **4. dashboard.py**
+- **Purpose:**  
+  Acts as the central web interface (Flask application) for the system. It provides:
+  - Routes to trigger the automated update (calling functions from update_google_sheets.py or the shared module).
+  - Routes to perform cleaning/formatting of the daily coverage data (currently similar to cleandailycov.py, but planned to be refactored into daily_utils.py).
+  - A form for manual absence entry that calls the functions from manual_load.py.
+- **Place in Workflow:**  
+  This is the main point of user interaction. It consolidates all web GUI functionality into one application and will eventually rely on the shared module (daily_utils.py) for its backend logic.
+
+### **5. app.py**
+- **Purpose:**  
+  An older version of the Flask application.
+- **Place in Workflow:**  
+  It was used earlier to provide a web interface but is now considered redundant. Its functionality is (or will be) fully covered by the updated **dashboard.py**. Once confirmed, **app.py** can be safely removed from the codebase.
+
+### **6. Proposed daily_utils.py (Shared Utility Module)**
+- **Purpose:**  
+  To consolidate the common functions from **cleandailycov.py** and parts of **dashboard.py** (and possibly parts of update_google_sheets.py if they share similar operations) into one module. Functions will include:
+  - Reading data from Google Sheets.
+  - Cleaning and standardizing teacher/substitute names.
+  - Sorting and updating the daily coverage data.
+  - Applying cell formatting (e.g., dark-gray fill for target values).
+- **Place in Workflow:**  
+  This module will be imported by the centralized dashboard (dashboard.py) and potentially by other scripts if needed, ensuring that common functionality is maintained in one place for easier updates and testing.
+
+---
+
+## **Clarification on Consolidation**
+
+There was some confusion about which files to consolidate. Here’s the plan:
+- **Primary Goal:**  
+  Consolidate the overlapping logic from **cleandailycov.py** and parts of **dashboard.py** into a new shared module (**daily_utils.py**).  
+- **Result:**  
+  - **dashboard.py** will serve as the single, centralized web interface.  
+  - It will call functions from **daily_utils.py** to perform data cleaning, formatting, and updates.
+- **What to Do with Other Scripts:**  
+  - **update_google_sheets.py** will remain mostly separate because it handles the automated update process.
+  - **cleandailycov.py**’s functionality will be merged into **daily_utils.py** (and then referenced by dashboard.py), so its redundant code will eventually be removed.
+  - **app.py** is deprecated and can be deleted once the new dashboard fully covers its features.
+
+---
+
+## **Summary of Next Steps**
+
+1. **Placeholder Update:**  
+   - Change the filler value in manual_load.py to `"NSN"` for inactive periods when only specific periods are off.
+
+2. **Module Consolidation:**  
+   - Create **daily_utils.py** to house shared functionality from cleandailycov.py (and any overlapping code from dashboard.py).
+   - Update **dashboard.py** to call these shared functions.
+   - Remove redundant code from cleandailycov.py and, if applicable, update_google_sheets.py remains separate.
+
+3. **Simplify the Web Interface:**  
+   - Use **dashboard.py** as the centralized Flask app.
+   - Implement UI/UX enhancements using **Bootstrap** (or a similar framework) for responsive design and dynamic form behavior.
+
+4. **Security and Hosting:**  
+   - Secure the web interface with HTTPS and possibly basic authentication.
+   - Choose a hosting provider (recommendation: Heroku for ease of use, with Render as an alternative).
+
+5. **Final Refactoring and Testing:**  
+   - Ensure error handling and logging are robust.
+   - Test the integrated workflow (automated updates, cleaning, and manual absence entry) via the web dashboard.
+
+---
+
+This summary should provide all the context and details needed to pick up the work later without many follow-up questions. If additional clarifications are needed in the future, this document will serve as a solid starting point.
+
+File Structure:
+We are working out of teacher-absence-tracking/app
+
+
+(venv) bmcmanus@DDE-990AP-T12 teacher-absence-tracking % tree -I venv
+.
+├── Automating Daily Report Download & Google Sheets Integration.txt
+├── README.md
+├── Sub Start Process - Rough Version - Nearly Complete 2:1:25.txt
+├── __pycache__
+│   └── app.cpython-311.pyc
+├── app
+│   ├── __init__.py
+│   ├── __pycache__
+│   │   └── manual_load.cpython-311.pyc
+│   ├── cleandailycov.py
+│   ├── credentials.json
+│   ├── daily_utils.py
+│   ├── dashboard.py
+│   ├── manual_load.py
+│   ├── static
+│   ├── templates
+│   │   ├── index.html
+│   │   └── report.html
+│   └── update_google_sheets.py
+├── data
+│   ├── Aesop - Daily Report.csv
+│   ├── Aesop - Daily Report.pdf
+│   ├── daily_coverage.csv
+│   ├── extracted_absences.csv
+│   ├── master_schedule - sheet1 (1).csv
+│   ├── sub_pdf1.workflow
+│   │   └── Contents
+│   │       ├── Info.plist
+│   │       ├── QuickLook
+│   │       │   └── Preview.png
+│   │       └── document.wflow
+│   ├── sub_pdf_1_convert.py
+│   └── teacher_list.csv
+├── drop
+│   └── Aesop - Daily Report.pdf
+├── requirements.txt
+├── s2_t_sched.csv
+├── sub Check description.txt
+└── sub_start_scripts_2.1.25.txt
+
+Scripts:
+Sub_Start Scripts -1 15:00 2/1/25
+
+#update_google_sheets.py
+import gspread
+from google.oauth2.service_account import Credentials
+import re
+from fuzzywuzzy import fuzz
+
+# Google Sheets authentication setup
+SERVICE_ACCOUNT_FILE = "/Users/bmcmanus/Documents/coverage_pulled_apart/teacher-absence-tracking/app/credentials.json"
+SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
+
+try:
+    creds = Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=SCOPES)
+    client = gspread.authorize(creds)
+except Exception as e:
+    print(f"❌ Error loading credentials: {str(e)}")
+    exit(1)
+
+# Google Sheets IDs
+DAILY_REPORT_ID = "1xLysLjaHLvXl7BxtnO3xZZoxseICjeYgRrgWgnuTMLM"
+DAILY_COVERAGE_ID = "1vIpDw6erO5dO8IlMfoQlvfSS8fVd76WSaj28uwEZwuk"
+MASTER_SCHEDULE_ID = "12XNbaa4AvahxYxR7D6Qa6DfrEeZPgrSiTTo5V9uFTsg"
+
+def clean_teacher_name(name):
+    """
+    Cleans the teacher name string by removing any newlines and extra information.
+    Assumes name is in the format "Last, First" (or similar).
+    """
+    name = re.sub(r'\n.*', '', name).strip()
+    parts = name.split(',')
+    if len(parts) >= 2:
+        return f"{parts[0].strip()}, {parts[1].strip()}"
+    return name
+
+def clean_sub_name(name):
+    """
+    Cleans the substitute name string by removing phone numbers and extra whitespace.
+    """
+    name = re.sub(r'\(\d{3}\) \d{3}-\d{4}', '', name).strip()
+    return name
+
+def find_teacher_in_master(teacher_name, master_data):
+    """
+    Finds a matching teacher row in the master schedule data using fuzzy matching.
+    Expects the teacher's name to be in the first column of master_data.
+    """
+    highest_ratio = 0
+    best_match = None
+    
+    # Cache lowercased teacher names from master data (skip header if present)
+    # Assuming that master_data might include a header row; adjust the slicing if needed.
+    for row in master_data[1:]:
+        if row and row[0]:
+            lowercased_name = row[0].lower()
+            ratio = fuzz.ratio(teacher_name.lower(), lowercased_name)
+            if ratio > highest_ratio and ratio > 85:
+                highest_ratio = ratio
+                best_match = row
+    return best_match
+
+def main():
+    try:
+        # Set header row for the daily_coverage sheet
+        coverage_header = ["Teacher/TA", "HR", "1", "2", "3", "4", "5", "6", "7", "8", "9", "Subs", "Duration"]
+
+        # Open all sheets
+        daily_report_sheet = client.open_by_key(DAILY_REPORT_ID).sheet1
+        daily_coverage_sheet = client.open_by_key(DAILY_COVERAGE_ID).sheet1
+        master_schedule_sheet = client.open_by_key(MASTER_SCHEDULE_ID).sheet1
+
+        # Get raw data from daily_report (which has no header row)
+        daily_report_data = daily_report_sheet.get_all_values()
+        master_schedule_data = master_schedule_sheet.get_all_values()
+
+        # Filter valid absence rows:
+        # We expect valid rows to have data in column C (index 2). (Adjust filtering as needed.)
+        valid_rows = [row for row in daily_report_data if len(row) > 2 and row[2].strip()]
+
+        update_data = [coverage_header]
+
+        for row in valid_rows:
+            # Extract data using fixed column positions:
+            # Column C (index 2): Teacher info
+            # Column F (index 5): Duration
+            # Column I (index 8): Substitute info
+            teacher_raw = row[2] if len(row) > 2 else ""
+            duration_raw = row[5] if len(row) > 5 else ""
+            sub_raw = row[8] if len(row) > 8 else ""
+
+            # Clean the extracted data
+            teacher_name = clean_teacher_name(teacher_raw)
+            sub_name = clean_sub_name(sub_raw)
+            duration = duration_raw.strip()
+
+            # Initialize a new row for daily_coverage (13 columns total)
+            new_row = [""] * 13
+            new_row[0] = teacher_name       # Teacher/TA in column A
+            new_row[12] = duration          # Duration in column M
+            new_row[11] = sub_name          # Substitute info in column L
+
+            # Look up the teacher's schedule in the master schedule
+            master_row = find_teacher_in_master(teacher_name, master_schedule_data)
+            if master_row:
+                # Copy columns B through K (indices 1 to 10) from the master schedule row into daily_coverage
+                for i in range(1, 11):
+                    if i < len(master_row):
+                        new_row[i] = master_row[i]
+            update_data.append(new_row)
+
+        # Clear existing data on daily_coverage and update with the new data
+        daily_coverage_sheet.clear()
+        if len(update_data) > 1:
+            daily_coverage_sheet.update('A1', update_data, value_input_option='USER_ENTERED')
+            print(f"✅ Successfully updated {len(update_data)-1} rows in daily_coverage!")
+        else:
+            print("⚠️ No data to update in daily_coverage")
+            
+    except gspread.exceptions.APIError as e:
+        print(f"❌ Google Sheets API error occurred: {str(e)}")
+    except gspread.exceptions.SpreadsheetNotFound as e:
+        print(f"❌ Spreadsheet not found: {str(e)}")
+    except gspread.exceptions.WorksheetNotFound as e:
+        print(f"❌ Worksheet not found: {str(e)}")
+    except Exception as e:
+        print(f"❌ An unexpected error occurred: {str(e)}")
+
+if __name__ == "__main__":
+    main()
+
+#manual_load.py
+import gspread
+from google.oauth2.service_account import Credentials
+
+# Google Sheets authentication setup
+SERVICE_ACCOUNT_FILE = "/Users/bmcmanus/Documents/coverage_pulled_apart/teacher-absence-tracking/app/credentials.json"
+SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
+
+try:
+    creds = Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=SCOPES)
+    client = gspread.authorize(creds)
+except Exception as e:
+    print(f"❌ Error loading credentials: {e}")
+    raise RuntimeError("Error loading credentials")
+
+# Google Sheets IDs
+DAILY_REPORT_ID = "1xLysLjaHLvXl7BxtnO3xZZoxseICjeYgRrgWgnuTMLM"
+DAILY_COVERAGE_ID = "1vIpDw6erO5dO8IlMfoQlvfSS8fVd76WSaj28uwEZwuk"
+MASTER_SCHEDULE_ID = "12XNbaa4AvahxYxR7D6Qa6DfrEeZPgrSiTTo5V9uFTsg"
+
+def add_manual_absence(teacher_name, duration, periods, sub_name=""):
+    """Adds a manual absence entry to the daily_coverage sheet.
+    
+    - If duration is "Full Day": the teacher’s master schedule is copied (HR – period 9).
+    - If "Half Day AM": master data is used for HR – period 5 and periods 6–9 are filled with FILL_VALUE.
+    - If "Half Day PM": master data is used for periods 5–9 and HR–period 4 are filled with FILL_VALUE.
+    - If "Period": only the user‑selected periods (from the checkboxes) are taken from the master schedule;
+      all other period cells are filled with FILL_VALUE.
+    """
+    try:
+        # Open daily_coverage and master_schedule sheets
+        daily_coverage_sheet = client.open_by_key(DAILY_COVERAGE_ID).sheet1
+        master_schedule_sheet = client.open_by_key(MASTER_SCHEDULE_ID).sheet1
+
+        # Fetch master schedule data
+        master_schedule_data = master_schedule_sheet.get_all_values()
+
+        def find_teacher_in_master(teacher_name, master_schedule_data):
+            for row in master_schedule_data:
+                if row[0] == teacher_name:
+                    return row
+            return None
+
+        master_row = find_teacher_in_master(teacher_name, master_schedule_data)
+        if not master_row:
+            print(f"❌ Teacher {teacher_name} not found in master schedule")
+            return
+
+        # Initialize a new row for daily_coverage (13 columns total: A through M)
+        new_row = [""] * 13
+        new_row[0] = teacher_name  # Column A
+
+        # FILL_VALUE represents the dark-gray filler (as specified, "NSN")
+        FILL_VALUE = "NSN"
+
+        # Helper functions for the various duration options.
+        def handle_full_day(master_row, new_row):
+            # For full day, simply copy master schedule (columns B-K)
+            for i in range(1, 11):  # Indices 1 to 10 correspond to HR, 1,2,...,9
+                if i < len(master_row):
+                    new_row[i] = master_row[i]
+
+        def handle_half_day_am(master_row, new_row):
+            # For Half Day AM: copy master schedule for HR and periods 1–5.
+            # (Mapping: index 1 = HR, index 2 = "1", …, index 6 = "5")
+            # Then fill indices 7–10 (periods 6–9) with FILL_VALUE.
+            for i in range(1, 11):
+                if i < len(master_row):
+                    if i <= 6:
+                        new_row[i] = master_row[i]
+                    else:
+                        new_row[i] = FILL_VALUE
+
+        def handle_half_day_pm(master_row, new_row):
+            # For Half Day PM: fill HR through period 4 with FILL_VALUE
+            # (Indices 1–5 correspond to HR, "1", "2", "3", "4")
+            # and copy master schedule for periods 5–9 (indices 6–10).
+            for i in range(1, 11):
+                if i < len(master_row):
+                    if i <= 5:
+                        new_row[i] = FILL_VALUE
+                    else:
+                        new_row[i] = master_row[i]
+
+        def handle_selected_periods(selected_periods, master_row, new_row):
+            # period_names mapping: index 1: HR, 2: "1", 3: "2", 4: "3", 5: "4",
+            # 6: "5", 7: "6", 8: "7", 9: "8", 10: "9"
+            period_names = ["HR", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
+            for i in range(1, 11):
+                if i < len(master_row):
+                    current_period = period_names[i - 1]
+                    if current_period in selected_periods:
+                        new_row[i] = master_row[i]
+                    else:
+                        new_row[i] = FILL_VALUE
+
+        # Decide which function to use based on the duration selection.
+        if duration == "Full Day":
+            handle_full_day(master_row, new_row)
+        elif duration == "Half Day AM":
+            handle_half_day_am(master_row, new_row)
+        elif duration == "Half Day PM":
+            handle_half_day_pm(master_row, new_row)
+        elif duration == "Period":
+            handle_selected_periods(periods, master_row, new_row)
+        else:
+            print("Invalid duration or periods specified")
+            return
+
+        # Set substitute info and duration in columns L and M respectively.
+        new_row[11] = sub_name
+        new_row[12] = duration
+
+        daily_coverage_sheet.append_row(new_row, value_input_option='USER_ENTERED')
+        print(f"✅ Added manual absence for {teacher_name}")
+
+    except Exception as e:
+        print(f"❌ Error adding manual absence: {e}")
+
+#cleandailycov.py
+import gspread
+from google.oauth2.service_account import Credentials
+import pandas as pd
+import re
+
+# === Configuration ===
+SERVICE_ACCOUNT_FILE = "/Users/bmcmanus/Documents/coverage_pulled_apart/teacher-absence-tracking/app/credentials.json"
+SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
+
+# Google Sheets IDs
+DAILY_COVERAGE_ID = "1vIpDw6erO5dO8IlMfoQlvfSS8fVd76WSaj28uwEZwuk"
+MASTER_SCHEDULE_ID = "12XNbaa4AvahxYxR7D6Qa6DfrEeZPgrSiTTo5V9uFTsg"
+
+# === Authentication ===
+creds = Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=SCOPES)
+client = gspread.authorize(creds)
+
+# === Callable main() function ===
+def main():
+    # Open the spreadsheets.
+    daily_coverage_sheet = client.open_by_key(DAILY_COVERAGE_ID).sheet1
+    master_schedule_sheet = client.open_by_key(MASTER_SCHEDULE_ID).sheet1
+
+    # Load data.
+    daily_coverage_data = daily_coverage_sheet.get_all_values()
+    master_schedule_data = master_schedule_sheet.get_all_values()
+
+    # Convert to DataFrame, skipping header row.
+    df = pd.DataFrame(daily_coverage_data[1:], columns=daily_coverage_data[0])
+
+    # For reference (if needed).
+    valid_teachers = {row[0].split(',')[0].strip(): row[0] for row in master_schedule_data[1:] if row}
+
+    # --- Helper Functions ---
+    def clean_teacher_name(name):
+        match = re.match(r"([^,]+,\s+\S+)", name)  # Keeps "Last, First"
+        return match.group(0) if match else name
+
+    def clean_sub_name(name):
+        return re.sub(r"\(\d{3}\) \d{3}-\d{4}", "", name).strip()
+
+    # This function ensures that cells containing these non-teaching blocks are preserved.
+    def should_replace_with_sub(cell):
+        if cell in ["Prep", "Plan/Duty", "Duty/Plan", "Lunch"] or re.match(r"w/\s*\w+", cell):
+            return False
+        return True
+
+    # Apply cleaning functions.
+    df["Teacher/TA"] = df["Teacher/TA"].apply(clean_teacher_name)
+    df["Subs"] = df["Subs"].apply(clean_sub_name)
+
+    # Replace cell values with "sub" where appropriate (for periods columns C-K).
+    for col in df.columns[2:11]:
+        df[col] = df[col].apply(lambda x: "sub" if should_replace_with_sub(x) else x)
+
+    # Sort the DataFrame.
+    teachers_with_schedule = df[df.iloc[:, 2:].notna().any(axis=1)]
+    teachers_without_schedule = df[~df.index.isin(teachers_with_schedule.index)]
+    sorted_df = pd.concat([teachers_with_schedule, teachers_without_schedule.sort_values(by="Teacher/TA")])
+
+    # Rebuild the data with header.
+    updated_data = [daily_coverage_data[0]] + sorted_df.values.tolist()
+
+    # Update the sheet with cleaned data.
+    daily_coverage_sheet.clear()
+    daily_coverage_sheet.update(updated_data)
+    print("✅ daily_coverage cleaned and updated successfully!")
+
+    # === Apply Dark Gray Fill to Target Cells ===
+    # Define the dark gray color (RGB values in 0–1 range; adjust if needed).
+    dark_gray_fill = {"red": 0.41, "green": 0.41, "blue": 0.41}
+
+    # Build a list of formatting requests.
+    requests = []
+    sheet_id = daily_coverage_sheet.id
+    num_rows = len(updated_data)
+    num_cols = len(updated_data[0])
+    target_values = {"4", "Prep", "Plan/Duty", "Duty/Plan", "Lunch"}
+
+    # Iterate over each cell.
+    for i in range(num_rows):
+        for j in range(num_cols):
+            if updated_data[i][j] in target_values:
+                requests.append({
+                    "repeatCell": {
+                        "range": {
+                            "sheetId": sheet_id,
+                            "startRowIndex": i,
+                            "endRowIndex": i + 1,
+                            "startColumnIndex": j,
+                            "endColumnIndex": j + 1
+                        },
+                        "cell": {
+                            "userEnteredFormat": {
+                                "backgroundColor": dark_gray_fill
+                            }
+                        },
+                        "fields": "userEnteredFormat.backgroundColor"
+                    }
+                })
+
+    if requests:
+        daily_coverage_sheet.spreadsheet.batch_update({"requests": requests})
+        print("✅ Applied dark gray fill to target cells.")
+    else:
+        print("No target cells found for formatting.")
+
+# Allow the function to be callable when imported.
+if __name__ == "__main__":
+    main()
+
+#dashboard.py
+# dashboard.py
+from flask import Flask, render_template, redirect, url_for, request, flash
+import update_google_sheets   # Make sure update_google_sheets.py defines a callable main() function.
+import cleandailycov          # Make sure cleandailycov.py defines a callable main() function.
+import manual_load            # Already used in your manual load code.
+import gspread
+from google.oauth2.service_account import Credentials
+
+app = Flask(__name__)
+app.secret_key = "your_secret_key"  # Needed for flash messages
+
+# For the manual load page, we need to load teacher names.
+# This function is similar to the one we used in app.py.
+SERVICE_ACCOUNT_FILE = "/Users/bmcmanus/Documents/coverage_pulled_apart/teacher-absence-tracking/app/credentials.json"
+SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
+creds = Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=SCOPES)
+gs_client = gspread.authorize(creds)
+TEACHER_LIST_ID = "1t9rbXT-CMJQEhbwYMOSdvMOrQfajwKS1lnkSyhBxUGw"
+PERIOD_OPTIONS = ["HR", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
+
+def get_teacher_names():
+    try:
+        teacher_sheet = gs_client.open_by_key(TEACHER_LIST_ID).sheet1
+        teacher_data = teacher_sheet.col_values(1)
+        # Skip header if present:
+        if teacher_data and teacher_data[0].lower() in ["teacher", "name"]:
+            teacher_data = teacher_data[1:]
+        return teacher_data
+    except Exception as e:
+        print(f"Error loading teacher list: {e}")
+        return []
+
+# Home/dashboard page with links to each process.
+@app.route("/")
+def home():
+    return render_template("dashboard.html")
+
+# Route to run update_google_sheets
+@app.route("/update")
+def update():
+    try:
+        update_google_sheets.main()
+        flash("Google Sheets updated successfully!", "success")
+    except Exception as e:
+        flash(f"Error updating Google Sheets: {e}", "danger")
+    return redirect(url_for("home"))
+
+# Route to run cleandailycov
+@app.route("/clean")
+def clean():
+    try:
+        cleandailycov.main()  # Make sure your cleandailycov.py defines a main() function, or refactor its logic into one.
+        flash("Daily Coverage cleaned successfully!", "success")
+    except Exception as e:
+        flash(f"Error cleaning Daily Coverage: {e}", "danger")
+    return redirect(url_for("home"))
+
+# Route for manual absence entry (similar to your current manual load form)
+@app.route("/manual", methods=["GET", "POST"])
+def manual():
+    if request.method == "POST":
+        teacher_name = request.form.get("teacher_name")
+        duration = request.form.get("duration")
+        sub_name = request.form.get("sub_name")
+        periods = request.form.getlist("periods")  # Will be a list from checkboxes.
+        try:
+            manual_load.add_manual_absence(teacher_name, duration, periods, sub_name)
+            flash("Manual absence added successfully!", "success")
+        except Exception as e:
+            flash(f"Error adding manual absence: {e}", "danger")
+        return redirect(url_for("manual"))
+    teacher_names = get_teacher_names()
+    return render_template("manual.html", teacher_names=teacher_names, period_options=PERIOD_OPTIONS)
+
+if __name__ == "__main__":
+    app.run(debug=True)

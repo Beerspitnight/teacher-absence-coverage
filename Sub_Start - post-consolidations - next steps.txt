@@ -1,0 +1,135 @@
+Below is a detailed review of your consolidated code with observations, suggestions, and a few minor points to consider:
+
+---
+
+## **General Impressions**
+
+- **Modularity:**  
+  You’ve successfully split out shared functionality into a common module (`daily_utils.py`) and centralized your Flask routes in `dashboard.py`. This is a solid improvement over having redundant code in multiple files.
+
+- **Functionality:**  
+  The core operations (reading/cleaning Google Sheets data, updating sheets, handling manual absence entries, and applying formatting) are all present and largely consistent with your earlier design.
+
+---
+To Do:
+All:
+1. **Credential Path Consistency:**  
+   Use a common approach (preferably via environment variables or a config file) for loading the service account file.
+- **Consistency of Credential Paths:**  
+  - Currently, `manual_load.py` uses `"credentials.json"`, while `daily_utils.py` and `update_google_sheets.py` use an absolute path. For deployment, consider centralizing this in a configuration file or environment variables so that all modules load credentials consistently.
+
+Create centralized environmental variable configuration for get_gspread_client and service_account_file.  Use in all scripts. Replace and update as needed.
+
+To Do:
+### **1. `manual_load.py`**
+2. **Lambda Functions for Period Mapping:**  
+   Consider refactoring these into regular functions for improved readability.
+Refractor this:
+The lambda for `"Period"` uses a list comprehension solely for its side effects. While this works, it can be less clear to someone reading the code. Consider refactoring this into a regular function for better readability in the future.
+
+To Do:
+### **2. `dashboard.py`**
+Redirect the user back to the dashboard/index
+  - After processing a POST on `/manual`, you redirect back to the same `/manual` route. Depending on your UX goals, you might also consider redirecting to the home/dashboard page if that provides a clearer flow.
+
+
+---
+
+## **File-by-File Review**
+
+### **1. `manual_load.py`**
+
+- **Authentication & Client Initialization:**  
+  - You’ve defined `get_gspread_client()` to encapsulate credential loading.  
+  - **Note:** The `SERVICE_ACCOUNT_FILE` here is set to `"credentials.json"`. In contrast, other modules (like `daily_utils.py` and `update_google_sheets.py`) use an absolute path. For consistency and easier deployment, consider centralizing the configuration (perhaps via an environment variable or a config file).
+
+- **Teacher Lookup:**  
+  - The function `find_teacher_in_master()` uses an exact match (`row[0] == teacher_name`). This is acceptable for manual entries if you expect an exact match.
+
+- **Handling Absences:**  
+  - The mapping dictionary (`period_mapping`) neatly assigns a lambda function for each duration option.  
+  - **Observation:**  
+    - The lambda for `"Period"` uses a list comprehension solely for its side effects. While this works, it can be less clear to someone reading the code. Consider refactoring this into a regular function for better readability in the future.
+  - **Functionality:**  
+    - The placeholder (`FILL_VALUE`) is correctly set to `"NSN"` and is used in all relevant branches.
+  
+- **Error Handling:**  
+  - Exceptions are printed and then re-raised. This is fine for debugging; just be sure to adjust logging as needed in production.
+
+### **2. `dashboard.py`**
+
+- **Flask Application:**
+  - All routes are defined in one place. You have routes for:
+    - `/` (dashboard home)
+    - `/update` (triggering the update process)
+    - `/clean` (cleaning and formatting the daily coverage sheet)
+    - `/manual` (displaying and processing the manual absence form)
+  
+- **Integration with Utility Modules:**
+  - You correctly import and call functions from `update_google_sheets`, `manual_load`, and `daily_utils`.
+  - The use of flash messages to provide user feedback is a good touch.
+  
+- **Minor Suggestion:**  
+  - After processing a POST on `/manual`, you redirect back to the same `/manual` route. Depending on your UX goals, you might also consider redirecting to the home/dashboard page if that provides a clearer flow.
+
+Done:
+- **Secret Key:**  cf5242909e451b131dae78327853ada3f0ed79a8eb82b0bd1868f77ade453674
+  - The placeholder `"your_secret_key"` is used. Remember to replace this with a strong, secure secret (ideally loaded from an environment variable) before deploying.
+
+### **3. `daily_utils.py`**
+
+- **Google Sheets Access:**  
+  - The functions for initializing the client, getting sheet data, and retrieving teacher names are well written.  
+  - **Configuration Note:**  
+    - The `SERVICE_ACCOUNT_FILE` here is an absolute path. Align this with the approach in other modules for consistency.
+
+- **Data Cleaning & Processing:**  
+  - The cleaning functions for teacher and substitute names, as well as the replacement logic for period columns, look correct.
+  - Sorting logic (separating rows with and without schedule data) is preserved from your earlier version.
+  
+- **Formatting Functions:**  
+  - The `apply_cell_formatting()` function correctly builds and submits a batch update request to format cells with target values (including `"NSN"` now).  
+  - This approach is clear and leverages the Sheets API as expected.
+
+- **Main Operation:**  
+  - The `clean_daily_coverage()` function brings together data loading, processing, updating, and formatting. Returning a boolean to indicate success allows your Flask route to provide feedback.
+
+### **4. `update_google_sheets.py`**
+
+- **Authentication & Global Client:**  
+  - This file initializes its own client using an absolute path for the credentials.  
+  - **Consideration:**  
+    - For future maintenance, you might want to refactor client initialization into a shared function (as you did in the other modules) so that all parts of the application use the same configuration source.
+  
+- **Fuzzy Matching:**  
+  - The use of fuzzywuzzy with a threshold of 85 for matching teacher names is maintained from your original code.
+  
+- **Data Update Logic:**  
+  - The script builds the updated data by iterating over valid rows, cleaning values, and copying schedule details from the master schedule.  
+  - It then clears the daily coverage sheet and updates it with the new data.
+  
+- **Error Handling:**  
+  - The multiple exception handlers for API errors, spreadsheet/worksheet not found, etc., are all in place.
+
+---
+
+## **Additional Observations & Suggestions**
+
+- **Consistency of Credential Paths:**  
+  - Currently, `manual_load.py` uses `"credentials.json"`, while `daily_utils.py` and `update_google_sheets.py` use an absolute path. For deployment, consider centralizing this in a configuration file or environment variables so that all modules load credentials consistently.
+
+- **Code Duplication:**  
+  - Although you’ve consolidated many functions, the client initialization and some authentication logic are still repeated. In the long term, you might create a small module (e.g., `gsheet_client.py`) that all other modules import.
+
+- **Lambda Readability in `manual_load.py`:**  
+  - The use of lambdas with `__setitem__` in the `period_mapping` dictionary works but can be a bit opaque. Refactoring these into named helper functions might improve clarity.
+
+- **Deployment Considerations:**  
+  - Ensure that the secret key and credentials are not hardcoded in production; use environment variables.  Done secret key is created and uploaded as an environmental variable. 
+  - Verify that your absolute paths (in `daily_utils.py` and `update_google_sheets.py`) are updated appropriately for the deployed environment.
+
+- **Testing:**  
+  - Before deploying, test each route and function with a few sample data sets to confirm that data cleaning, formatting, and updating occur as expected.
+
+---
+

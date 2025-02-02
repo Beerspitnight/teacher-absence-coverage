@@ -1,0 +1,409 @@
+#manual_load.py
+import gspread
+from google.oauth2.service_account import Credentials
+
+# Google Sheets authentication setup
+SERVICE_ACCOUNT_FILE = "credentials.json"
+SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
+
+def get_gspread_client():
+    try:
+        creds = Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=SCOPES)
+        return gspread.authorize(creds)
+    except Exception as e:
+        print(f"❌ Error loading credentials: {e}")
+        raise RuntimeError("Failed to initialize Google Sheets client")
+
+# Google Sheets IDs
+DAILY_COVERAGE_ID = "1vIpDw6erO5dO8IlMfoQlvfSS8fVd76WSaj28uwEZwuk"
+MASTER_SCHEDULE_ID = "12XNbaa4AvahxYxR7D6Qa6DfrEeZPgrSiTTo5V9uFTsg"
+
+FILL_VALUE = "NSN"  # Placeholder for inactive periods
+
+
+def find_teacher_in_master(teacher_name, master_schedule_data):
+    for row in master_schedule_data:
+        if row and row[0] == teacher_name:
+            return row
+    return None
+
+
+def add_manual_absence(teacher_name, duration, periods, sub_name=""):
+    """Adds a manual absence entry to the daily_coverage sheet."""
+    try:
+        client = get_gspread_client()
+        daily_coverage_sheet = client.open_by_key(DAILY_COVERAGE_ID).sheet1
+        master_schedule_sheet = client.open_by_key(MASTER_SCHEDULE_ID).sheet1
+
+        master_schedule_data = master_schedule_sheet.get_all_values()
+        master_row = find_teacher_in_master(teacher_name, master_schedule_data)
+
+        if not master_row:
+            print(f"❌ Teacher {teacher_name} not found in master schedule")
+            return
+
+        new_row = [""] * 13
+        new_row[0] = teacher_name  # Column A
+
+        period_mapping = {
+            "Full Day": lambda row, new_row: new_row.__setitem__(slice(1, 11), row[1:11]),
+            "Half Day AM": lambda row, new_row: (new_row.__setitem__(slice(1, 7), row[1:7]), new_row.__setitem__(slice(7, 11), [FILL_VALUE] * 4)),
+            "Half Day PM": lambda row, new_row: (new_row.__setitem__(slice(1, 6), [FILL_VALUE] * 5), new_row.__setitem__(slice(6, 11), row[6:11])),
+            "Period": lambda row, new_row: [new_row.__setitem__(i, row[i]) if str(i) in periods else new_row.__setitem__(i, FILL_VALUE) for i in range(1, 11)],
+        }
+
+        if duration in period_mapping:
+            period_mapping[duration](master_row, new_row)
+        else:
+            print("❌ Invalid duration specified")
+            return
+
+        new_row[11] = sub_name  # Substitute name
+        new_row[12] = duration  # Duration
+
+        daily_coverage_sheet.append_row(new_row, value_input_option='USER_ENTERED')
+        print(f"✅ Added manual absence for {teacher_name}")
+    except Exception as e:
+        print(f"❌ Error adding manual absence: {e}")
+        raise
+
+#dashboard.py
+from flask import Flask, render_template, redirect, url_for, request, flash
+import update_google_sheets
+import manual_load
+import daily_utils  # Import the utility module
+
+app = Flask(__name__)
+app.secret_key = "your_secret_key"  # Needed for flash messages
+
+PERIOD_OPTIONS = ["HR", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
+
+# Use the function from daily_utils
+get_teacher_names = daily_utils.get_teacher_names
+
+@app.route("/")
+def home():
+    return render_template("dashboard.html")
+
+@app.route("/update")
+def update():
+    try:
+        update_google_sheets.main()
+        flash("Google Sheets updated successfully!", "success")
+    except Exception as e:
+        flash(f"Error updating Google Sheets: {e}", "danger")
+    return redirect(url_for("home"))
+
+@app.route("/clean")
+def clean():
+    try:
+        if daily_utils.clean_daily_coverage():
+            flash("Daily Coverage cleaned successfully!", "success")
+        else:
+            flash("Error cleaning Daily Coverage (No data or other issue). Check logs.", "danger")
+    except Exception as e:
+        flash(f"Error cleaning Daily Coverage: {e}", "danger")  # Handle any unexpected errors.
+    return redirect(url_for("home"))
+
+@app.route("/manual", methods=["GET", "POST"])
+def manual():
+    if request.method == "POST":
+        teacher_name = request.form.get("teacher_name")
+        duration = request.form.get("duration")
+        sub_name = request.form.get("sub_name", "")
+        periods = request.form.getlist("periods")  # Will be a list from checkboxes
+        
+        try:
+            manual_load.add_manual_absence(teacher_name, duration, periods, sub_name)
+            flash("Manual absence added successfully!", "success")
+        except Exception as e:
+            flash(f"Error adding manual absence: {e}", "danger")
+        
+        return redirect(url_for("manual"))
+    
+    teacher_names = get_teacher_names()
+    return render_template("manual.html", teacher_names=teacher_names, period_options=PERIOD_OPTIONS)
+
+if __name__ == "__main__":
+    app.run(debug=True)
+
+#daily_utils.py
+import gspread
+from google.oauth2.service_account import Credentials
+import pandas as pd
+import re
+
+# === Configuration ===
+SERVICE_ACCOUNT_FILE = "/Users/bmcmanus/Documents/coverage_pulled_apart/teacher-absence-tracking/app/credentials.json"
+SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
+
+# Google Sheets IDs
+DAILY_COVERAGE_ID = "1vIpDw6erO5dO8IlMfoQlvfSS8fVd76WSaj28uwEZwuk"
+MASTER_SCHEDULE_ID = "12XNbaa4AvahxYxR7D6Qa6DfrEeZPgrSiTTo5V9uFTsg"
+TEACHER_LIST_ID = "1t9rbXT-CMJQEhbwYMOSdvMOrQfajwKS1lnkSyhBxUGw"
+
+# Initialize Google Sheets client
+def get_gspread_client():
+    """Initialize and return an authorized Google Sheets client."""
+    try:
+        creds = Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=SCOPES)
+        return gspread.authorize(creds)
+    except Exception as e:
+        print(f"❌ Error initializing Google Sheets client: {e}")
+        raise
+
+# === Data Cleaning Functions ===
+def clean_teacher_name(name):
+    """Clean teacher name to 'Last, First' format."""
+    match = re.match(r"([^,]+,\s+\S+)", name)
+    return match.group(0) if match else name
+
+def clean_sub_name(name):
+    """Remove phone numbers and extra whitespace from substitute name."""
+    return re.sub(r"\(\d{3}\) \d{3}-\d{4}", "", name).strip()
+
+def should_replace_with_sub(cell):
+    """Check if a cell value should be replaced with 'sub'."""
+    if cell in ["Prep", "Plan/Duty", "Duty/Plan", "Lunch", "NSN"] or re.match(r"w/\s*\w+", cell):
+        return False
+    return True
+
+# === Sheet Access Functions ===
+def get_sheet_data(client, sheet_id):
+    """Get all values from a Google Sheet."""
+    try:
+        sheet = client.open_by_key(sheet_id).sheet1
+        return sheet.get_all_values()
+    except Exception as e:
+        print(f"❌ Error getting sheet data: {e}")
+        raise
+
+def get_teacher_names():
+    """Get list of teacher names from teacher list sheet."""
+    try:
+        client = get_gspread_client()
+        teacher_sheet = client.open_by_key(TEACHER_LIST_ID).sheet1
+        teacher_data = teacher_sheet.col_values(1)
+        if teacher_data and teacher_data[0].lower() in ["teacher", "name"]:
+            return teacher_data[1:]
+        return teacher_data
+    except Exception as e:
+        print(f"❌ Error loading teacher list: {e}")
+        return []
+
+# === Data Processing Functions ===
+def process_daily_coverage_data(data):
+    """Process and clean daily coverage data."""
+    if not data:
+        return None, None
+    
+    # Convert to DataFrame, skipping header row
+    df = pd.DataFrame(data[1:], columns=data[0])
+    
+    # Clean teacher and sub names
+    df["Teacher/TA"] = df["Teacher/TA"].apply(clean_teacher_name)
+    df["Subs"] = df["Subs"].apply(clean_sub_name)
+    
+    # Replace cell values with "sub" where appropriate
+    for col in df.columns[2:11]:
+        df[col] = df[col].apply(lambda x: "sub" if should_replace_with_sub(x) else x)
+    
+    # Sort the DataFrame
+    teachers_with_schedule = df[df.iloc[:, 2:].notna().any(axis=1)]
+    teachers_without_schedule = df[~df.index.isin(teachers_with_schedule.index)]
+    sorted_df = pd.concat([teachers_with_schedule, teachers_without_schedule.sort_values(by="Teacher/TA")])
+    
+    # Rebuild the data with header
+    return [data[0]] + sorted_df.values.tolist()
+
+# === Formatting Functions ===
+def apply_cell_formatting(sheet, updated_data):
+    """Apply dark gray fill to specific cells."""
+    dark_gray_fill = {"red": 0.41, "green": 0.41, "blue": 0.41}
+    requests = []
+    sheet_id = sheet.id
+    num_rows = len(updated_data)
+    num_cols = len(updated_data[0])
+    target_values = {"NSN", "Prep", "Plan/Duty", "Duty/Plan", "Lunch"}
+
+    for i in range(num_rows):
+        for j in range(num_cols):
+            if updated_data[i][j] in target_values:
+                requests.append({
+                    "repeatCell": {
+                        "range": {
+                            "sheetId": sheet_id,
+                            "startRowIndex": i,
+                            "endRowIndex": i + 1,
+                            "startColumnIndex": j,
+                            "endColumnIndex": j + 1
+                        },
+                        "cell": {
+                            "userEnteredFormat": {
+                                "backgroundColor": dark_gray_fill
+                            }
+                        },
+                        "fields": "userEnteredFormat.backgroundColor"
+                    }
+                })
+
+    if requests:
+        sheet.spreadsheet.batch_update({"requests": requests})
+        return True
+    return False
+
+# === Main Operations ===
+def clean_daily_coverage():
+    """Main function to clean and format daily coverage sheet."""
+    try:
+        client = get_gspread_client()
+        daily_coverage_sheet = client.open_by_key(DAILY_COVERAGE_ID).sheet1
+        
+        # Load and process data
+        daily_coverage_data = get_sheet_data(client, DAILY_COVERAGE_ID)
+        updated_data = process_daily_coverage_data(daily_coverage_data)
+        
+        if updated_data:
+            # Update sheet with cleaned data
+            daily_coverage_sheet.clear()
+            daily_coverage_sheet.update(updated_data)
+            
+            # Apply formatting
+            if apply_cell_formatting(daily_coverage_sheet, updated_data):
+                print("✅ Applied formatting to cells")
+            
+            print("✅ Daily coverage cleaned and updated successfully!")
+            return True
+    except Exception as e:
+        print(f"❌ Error in clean_daily_coverage: {e}")
+        raise
+    
+    return False
+
+#update_google_sheets
+import gspread
+from google.oauth2.service_account import Credentials
+import re
+from fuzzywuzzy import fuzz
+
+# Google Sheets authentication setup
+SERVICE_ACCOUNT_FILE = "/Users/bmcmanus/Documents/coverage_pulled_apart/teacher-absence-tracking/app/credentials.json"
+SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
+
+try:
+    creds = Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=SCOPES)
+    client = gspread.authorize(creds)
+except Exception as e:
+    print(f"❌ Error loading credentials: {str(e)}")
+    exit(1)
+
+# Google Sheets IDs
+DAILY_REPORT_ID = "1xLysLjaHLvXl7BxtnO3xZZoxseICjeYgRrgWgnuTMLM"
+DAILY_COVERAGE_ID = "1vIpDw6erO5dO8IlMfoQlvfSS8fVd76WSaj28uwEZwuk"
+MASTER_SCHEDULE_ID = "12XNbaa4AvahxYxR7D6Qa6DfrEeZPgrSiTTo5V9uFTsg"
+
+def clean_teacher_name(name):
+    """
+    Cleans the teacher name string by removing any newlines and extra information.
+    Assumes name is in the format "Last, First" (or similar).
+    """
+    name = re.sub(r'\n.*', '', name).strip()
+    parts = name.split(',')
+    if len(parts) >= 2:
+        return f"{parts[0].strip()}, {parts[1].strip()}"
+    return name
+
+def clean_sub_name(name):
+    """
+    Cleans the substitute name string by removing phone numbers and extra whitespace.
+    """
+    name = re.sub(r'\(\d{3}\) \d{3}-\d{4}', '', name).strip()
+    return name
+
+def find_teacher_in_master(teacher_name, master_data):
+    """
+    Finds a matching teacher row in the master schedule data using fuzzy matching.
+    Expects the teacher's name to be in the first column of master_data.
+    """
+    highest_ratio = 0
+    best_match = None
+    
+    # Cache lowercased teacher names from master data (skip header if present)
+    # Assuming that master_data might include a header row; adjust the slicing if needed.
+    for row in master_data[1:]:
+        if row and row[0]:
+            lowercased_name = row[0].lower()
+            ratio = fuzz.ratio(teacher_name.lower(), lowercased_name)
+            if ratio > highest_ratio and ratio > 85:
+                highest_ratio = ratio
+                best_match = row
+    return best_match
+
+def main():
+    try:
+        # Set header row for the daily_coverage sheet
+        coverage_header = ["Teacher/TA", "HR", "1", "2", "3", "4", "5", "6", "7", "8", "9", "Subs", "Duration"]
+
+        # Open all sheets
+        daily_report_sheet = client.open_by_key(DAILY_REPORT_ID).sheet1
+        daily_coverage_sheet = client.open_by_key(DAILY_COVERAGE_ID).sheet1
+        master_schedule_sheet = client.open_by_key(MASTER_SCHEDULE_ID).sheet1
+
+        # Get raw data from daily_report (which has no header row)
+        daily_report_data = daily_report_sheet.get_all_values()
+        master_schedule_data = master_schedule_sheet.get_all_values()
+
+        # Filter valid absence rows:
+        # We expect valid rows to have data in column C (index 2). (Adjust filtering as needed.)
+        valid_rows = [row for row in daily_report_data if len(row) > 2 and row[2].strip()]
+
+        update_data = [coverage_header]
+
+        for row in valid_rows:
+            # Extract data using fixed column positions:
+            # Column C (index 2): Teacher info
+            # Column F (index 5): Duration
+            # Column I (index 8): Substitute info
+            teacher_raw = row[2] if len(row) > 2 else ""
+            duration_raw = row[5] if len(row) > 5 else ""
+            sub_raw = row[8] if len(row) > 8 else ""
+
+            # Clean the extracted data
+            teacher_name = clean_teacher_name(teacher_raw)
+            sub_name = clean_sub_name(sub_raw)
+            duration = duration_raw.strip()
+
+            # Initialize a new row for daily_coverage (13 columns total)
+            new_row = [""] * 13
+            new_row[0] = teacher_name       # Teacher/TA in column A
+            new_row[12] = duration          # Duration in column M
+            new_row[11] = sub_name          # Substitute info in column L
+
+            # Look up the teacher's schedule in the master schedule
+            master_row = find_teacher_in_master(teacher_name, master_schedule_data)
+            if master_row:
+                # Copy columns B through K (indices 1 to 10) from the master schedule row into daily_coverage
+                for i in range(1, 11):
+                    if i < len(master_row):
+                        new_row[i] = master_row[i]
+            update_data.append(new_row)
+
+        # Clear existing data on daily_coverage and update with the new data
+        daily_coverage_sheet.clear()
+        if len(update_data) > 1:
+            daily_coverage_sheet.update('A1', update_data, value_input_option='USER_ENTERED')
+            print(f"✅ Successfully updated {len(update_data)-1} rows in daily_coverage!")
+        else:
+            print("⚠️ No data to update in daily_coverage")
+            
+    except gspread.exceptions.APIError as e:
+        print(f"❌ Google Sheets API error occurred: {str(e)}")
+    except gspread.exceptions.SpreadsheetNotFound as e:
+        print(f"❌ Spreadsheet not found: {str(e)}")
+    except gspread.exceptions.WorksheetNotFound as e:
+        print(f"❌ Worksheet not found: {str(e)}")
+    except Exception as e:
+        print(f"❌ An unexpected error occurred: {str(e)}")
+
+if __name__ == "__main__":
+    main()

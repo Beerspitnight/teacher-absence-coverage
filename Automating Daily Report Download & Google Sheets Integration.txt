@@ -1,0 +1,75 @@
+ /Users/bmcmanus/Documents/coverage_pulled_apart/teacher-absence-tracking/venv/bin/python app/download_report.py
+
+🚀 Project Summary: Automating Daily Report Download & Google Sheets Integration
+🔹 Project Goal
+We are automating the process of downloading the Frontline Education Daily Absence Report and converting it into a structured Google Sheets document. The goal is to:
+
+Log in to Frontline Education automatically using a Chromedriver-powered Selenium script.
+Navigate to the Absence Management section and access the Daily Absence Report page.
+Select today’s date, generate the PDF report, and download it automatically to a specified directory.
+Convert the PDF report into structured data.
+Upload the extracted data into a Google Sheet for easy access and analysis.
+✅ Work Completed So Far
+🔹 1. Setting Up Selenium with Chromedriver
+Installed chromedriver-autoinstaller to ensure that the latest ChromeDriver is always used.
+Configured Selenium WebDriver to automate Chrome.
+Set Chrome options to:
+Avoid bot detection ("--disable-blink-features=AutomationControlled")
+Disable pop-ups and prompts
+Download files automatically to a pre-defined directory.
+🔹 2. Securely Handling Login Credentials
+Stored username and password as environment variables (FRONTLINE_USERNAME and FRONTLINE_PASSWORD).
+Verified that environment variables load correctly before attempting login.
+Located username & password input fields using By.ID (Username, Password).
+Entered credentials into the login form using Selenium.
+Clicked the "Sign in with Frontline ID" button to submit the form.
+🔹 3. Navigating the Frontline Education UI
+Successfully logged in to Frontline Education.
+Detected post-login redirection to an application selection page.
+Attempted to click on "Absence Management" to proceed to the Daily Report section.
+🔧 Issues Encountered & Fixes
+✅ Fixed
+Login Credentials Not Inserting
+
+Used explicit waits (WebDriverWait) to ensure elements were available before interacting.
+Used correct element selectors for username, password, and login button.
+Redirection to Application Selection Page
+
+Instead of directly reaching the Daily Report page, we land on an application selection page.
+Identified the correct element ("Absence Management") but needed to adjust XPath.
+Incorrect Element Selection for "Absence Management"
+
+The script initially failed to click because the text was inside a <span>.
+Fixed by updating XPath to //span[contains(text(), 'Absence Management')].
+🛠 Work Still To Be Done
+🔹 1. Ensure "Absence Management" Click Works
+✅ Fix is in place, but needs testing.
+👉 Test if the script successfully clicks "Absence Management" and proceeds to the Daily Report page.
+
+🔹 2. Automate Selecting Today’s Date
+✅ The script currently attempts to select today’s date.
+🚨 Issue: The date picker may not be receiving input properly.
+👉 Test and refine date selection to ensure that today's date is inputted correctly.
+
+🔹 3. Ensure the "Print" Button Clicks Successfully
+✅ The script waits for and clicks "Print", but needs confirmation that it:
+
+Triggers the PDF generation
+Waits long enough for the file to generate 👉 Test and refine this step if necessary.
+🔹 4. Confirm File Download Completion
+✅ The script currently:
+
+Waits for the file to appear in the download folder.
+Checks if the correct file exists. 🚨 Issue: We need to make sure the correct file name is used (file_name = "your_report_file_name.pdf").
+👉 Confirm that the filename matches the downloaded report and modify as needed.
+🔹 5. Convert PDF to Google Sheets
+🚨 Next Big Step:
+
+Extract the required data from the PDF (once successfully downloaded).
+Convert the extracted data into a structured format (CSV or DataFrame).
+Upload to a Google Sheet using Google Sheets API.
+🚀 Next Steps (Immediate)
+Test clicking "Absence Management" → Verify that we reach the Daily Report page.
+Fix date selection if needed → Ensure today’s date is correctly entered.
+Confirm "Print" button clicks and triggers PDF download.
+Validate that the correct report downloads successfully.
