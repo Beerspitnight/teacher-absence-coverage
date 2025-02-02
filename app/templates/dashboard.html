@@ -13,12 +13,12 @@
     <p class="text-center">Follow these steps to update and clean absence data.</p>
 
     <!-- Alert Box for Status Messages -->
-    <div id="status-alert" class="alert alert-info d-none" role="alert"></div>  <!-- Initialize as hidden with info color -->
+    <div id="status-alert" class="alert alert-info d-none" role="alert"></div>
 
     <!-- Progress Bar -->
     <div class="progress mt-3 d-none" id="progress-bar-container">
         <div id="progress-bar" class="progress-bar progress-bar-striped progress-bar-animated" 
-            role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" style="width: 0%"></div>  <!-- Added aria attributes -->
+            role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" style="width: 0%"></div>
     </div>
 
     <div class="row justify-content-center mt-4">
@@ -26,7 +26,7 @@
             <div class="card shadow p-4">
                 <h5 class="text-secondary">🔄 Step 1: Update from Daily Report</h5>
                 <p>Click this button to pull today's absences from the Google Sheet.</p>
-                <button class="btn btn-primary w-100" data-url="{{ url_for('update') }}" id="update-button">
+                <button class="btn btn-primary w-100 task-button" data-url="{{ url_for('update') }}" data-method="POST">
                     Update Google Sheets
                 </button>
             </div>
@@ -34,62 +34,67 @@
             <div class="card shadow p-4 mt-3">
                 <h5 class="text-secondary">✏️ Step 2: Manually Add Absences</h5>
                 <p>If any teachers are missing, add them manually.</p>
-                <a href="#" class="btn btn-success w-100" data-url="{{ url_for('manual') }}" id="manual-button">Add Manual Absence</a>
+                <a href="{{ url_for('manual') }}" class="btn btn-success w-100">Add Manual Absence</a>
             </div>
 
             <div class="card shadow p-4 mt-3">
                 <h5 class="text-secondary">🧹 Step 3: Clean & Format Data</h5>
                 <p>Final step! Click to apply formatting and sorting.</p>
-                <button class="btn btn-warning w-100" data-url="{{ url_for('clean') }}" id="clean-button">Clean Data</button>
+                <button class="btn btn-warning w-100 task-button" data-url="{{ url_for('clean') }}" data-method="POST">
+                    Clean Data
+                </button>
             </div>
         </div>
     </div>
 
-    <!-- JavaScript for Progress Bar & Alerts (moved to the end of the body) -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script> <!--- Moved before custom script -->
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- JavaScript for Progress Bar & Alerts -->
     <script>
-        function runTask(url, message) {
+        document.addEventListener("DOMContentLoaded", function() {
+            document.querySelectorAll(".task-button").forEach(button => {
+                button.addEventListener("click", function() {
+                    const url = this.getAttribute("data-url");
+                    const method = this.getAttribute("data-method") || "POST";
+                    runTask(url, this.innerText + " in progress...", method);
+                });
+            });
+        });
+
+        function runTask(url, message, method = "POST") {
             const progressBarContainer = document.getElementById('progress-bar-container');
             const progressBar = document.getElementById('progress-bar');
             const statusAlert = document.getElementById('status-alert');
 
-            // Show Progress Bar and Alert Message
             progressBarContainer.classList.remove('d-none');
-            progressBar.style.width = '10%';  // Initial width
+            progressBar.style.width = '10%';
             statusAlert.classList.remove('d-none');
-            statusAlert.classList.add('alert-info'); // Default to info
+            statusAlert.classList.add('alert-info');
             statusAlert.textContent = message;
 
-
-            fetch(url)
+            fetch(url, { method: method })
                 .then(response => {
-                    if (!response.ok) {
-                        throw new Error(`HTTP error! status: ${response.status}`); // Throw error for non-2xx responses
-                    }
-                    return response; // Assuming you might want to process a successful response later
+                    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                    return response.json();
                 })
-                .then(() => {  // Success handler
-                    statusAlert.classList.remove('alert-info');
-                    statusAlert.classList.add('alert-success');
+                .then(() => {
+                    statusAlert.classList.replace('alert-info', 'alert-success');
                     statusAlert.textContent = "✅ Task Completed Successfully!";
-                    progressBar.style.width = '100%'; 
-
+                    progressBar.style.width = '100%';
                 })
-                .catch(error => { // Error handler
-                    console.error('Error during fetch:', error); // Log the error to the console
-                    statusAlert.classList.remove('alert-info');
-                    statusAlert.classList.add('alert-danger');
-                    statusAlert.textContent = "❌ Task Failed! " + error.message; // Show more informative error
-                    progressBar.style.width = '100%'; // Still complete progress bar even on error
+                .catch(error => {
+                    console.error('Error during fetch:', error);
+                    statusAlert.classList.replace('alert-info', 'alert-danger');
+                    statusAlert.textContent = "❌ Task Failed! " + error.message;
+                    progressBar.style.width = '100%';
                 })
-                .finally(() => { // Always runs after success or failure
+                .finally(() => {
                     setTimeout(() => {
                         progressBarContainer.classList.add('d-none');
                         statusAlert.classList.add('d-none');
-                        progressBar.style.width = '0%'; // Reset progress bar for next use
-
+                        progressBar.style.width = '0%';
                     }, 3000);
-
                 });
         }
     </script>

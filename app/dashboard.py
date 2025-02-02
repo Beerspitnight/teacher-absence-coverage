@@ -4,7 +4,7 @@ import update_google_sheets
 import manual_load
 import daily_utils  # Import the utility module
 from google.oauth2.service_account import Credentials
-from flask import Flask, render_template, redirect, url_for, request, flash
+from flask import Flask, render_template, redirect, url_for, request, flash, jsonify
 
 def get_gspread_client():
     """Initialize and return an authorized Google Sheets client."""
@@ -28,14 +28,16 @@ get_teacher_names = daily_utils.get_teacher_names
 def home():
     return render_template("dashboard.html")
 
-@app.route("/update")
+@app.route("/update", methods=["POST"])
 def update():
     try:
-        update_google_sheets.main()
-        flash("Google Sheets updated successfully!", "success")
+        print("🔄 Running update_google_sheets()...")
+        update_google_sheets.main()  # Ensure this calls the main function
+        print("✅ Update completed!")
+        return jsonify({"success": True, "message": "✅ Google Sheets updated successfully!"})
     except Exception as e:
-        flash(f"Error updating Google Sheets: {e}", "danger")
-    return redirect(url_for("home"))
+        print(f"❌ Error updating Google Sheets: {e}")
+        return jsonify({"success": False, "message": f"❌ Error: {e}"}), 500
 
 @app.route("/clean")
 def clean():

@@ -1,51 +1,73 @@
+<!-- manual.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Manual Absence Entry</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
 <body class="container mt-4">
-
-    <h1 class="text-primary text-center">✏️ Add a Manual Absence</h1>
-
-    <form action="{{ url_for('manual') }}" method="POST" class="mt-4 card p-4 shadow">
+    <h1 class="text-center">✏️ Add Manual Absence</h1>
+    <form action="{{ url_for('manual') }}" method="POST">
+        
+        <!-- Teacher Dropdown -->
         <div class="mb-3">
-            <label for="teacher_name" class="form-label">👩‍🏫 Teacher Name:</label>
-            <select name="teacher_name" class="form-control" required>
+            <label for="teacher_name" class="form-label">Teacher Name:</label>
+            <select class="form-control" id="teacher_name" name="teacher_name" required>
+                <option value="" disabled selected>Select a Teacher</option>
                 {% for teacher in teacher_names %}
                     <option value="{{ teacher }}">{{ teacher }}</option>
                 {% endfor %}
             </select>
         </div>
-
+        
+        <!-- Duration Dropdown -->
         <div class="mb-3">
-            <label for="duration" class="form-label">🕒 Duration:</label>
-            <select name="duration" class="form-control" required>
+            <label for="duration" class="form-label">Duration:</label>
+            <select class="form-control" id="duration" name="duration" required onchange="togglePeriodSelection()">
+                <option value="" disabled selected>Select Duration</option>
                 <option value="Full Day">Full Day</option>
                 <option value="Half Day AM">Half Day AM</option>
                 <option value="Half Day PM">Half Day PM</option>
                 <option value="Period">Period</option>
             </select>
         </div>
-
+        
+        <!-- Period Selection (Checkboxes) -->
+        <div class="mb-3 d-none" id="period-selection">
+            <label class="form-label">Select Period(s):</label>
+            <div class="d-flex flex-wrap">
+                {% for period in ["HR", "1", "2", "3", "4", "5", "6", "7", "8", "9"] %}
+                    <div class="form-check me-3">
+                        <input class="form-check-input" type="checkbox" name="periods" value="{{ period }}" id="period-{{ period }}">
+                        <label class="form-check-label" for="period-{{ period }}">{{ period }}</label>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+        
+        <!-- Substitute Name -->
         <div class="mb-3">
-            <label class="form-label">📅 Periods (if applicable):</label><br>
-            {% for period in period_options %}
-                <input type="checkbox" name="periods" value="{{ period }}"> {{ period }} 
-            {% endfor %}
+            <label for="sub_name" class="form-label">Substitute Name (if applicable):</label>
+            <input type="text" class="form-control" id="sub_name" name="sub_name">
         </div>
 
-        <div class="mb-3">
-            <label for="sub_name" class="form-label">🧑‍🏫 Substitute Name:</label>
-            <input type="text" name="sub_name" class="form-control">
-        </div>
-
-        <button type="submit" class="btn btn-success w-100">Submit</button>
-        <a href="{{ url_for('home') }}" class="btn btn-secondary w-100 mt-2">Back to Dashboard</a>
+        <!-- Submit Button -->
+        <button type="submit" class="btn btn-primary w-100">Submit</button>
     </form>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        function togglePeriodSelection() {
+            var duration = document.getElementById("duration").value;
+            var periodSelection = document.getElementById("period-selection");
+            
+            if (duration === "Period") {
+                periodSelection.classList.remove("d-none");
+            } else {
+                periodSelection.classList.add("d-none");
+            }
+        }
+    </script>
 </body>
 </html>

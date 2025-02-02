@@ -40,29 +40,6 @@ The project is a teacher absence tracking system that automates and streamlines 
 
 ---
 
-## **What Still Needs to Be Done**
-
-Done - placeholder of 4 was updated to 'NSN' 2/1/25 15:56
-1. **Placeholder Update in Manual Entries:**
-   - Change the filler value from `"4"` to `"NSN"` in the manual absence logic (in **manual_load.py**) so that when a teacher is absent for specific periods, inactive periods are marked as `"NSN"` (meaning “no sub needed”). - I believe I did this.
-
-Done - script functions have been consolidated - 2/1/25 16:28
-2. **Simplify and Consolidate the Web Dashboard:**
-   - **Consolidate Common Functionality:**  
-     Merge the overlapping logic found in **cleandailycov.py** and **dashboard.py** into a shared utility module (for example, **daily_utils.py**).  
-     This module will include:
-     - Functions for reading and cleaning Google Sheets data.
-     - Functions for sorting and updating the daily coverage sheet.
-     - Functions for applying the dark-gray (or updated) cell formatting.
-   
-  
-   - **Centralize the Web Interface:**  
-3. Update **dashboard.py** so that it becomes the single, centralized Flask application. It will import and call the shared functions from **daily_utils.py** rather than duplicating logic.  
-     (The older **app.py** can be retired once all routes and functionalities are confirmed to be present in the new dashboard.)
-
-4. **UI/UX Enhancements:**
-   - Adopt a front-end framework (the recommendation is **Bootstrap** for its ease of integration and robust component library) to improve the look and responsiveness of the web interface.
-   - Implement dynamic form behaviors (e.g., disabling period checkboxes based on duration selection) and clear feedback via flash messages.
 
 5. **Security Enhancements:**
    - Secure the Flask application by serving it over HTTPS.
@@ -151,20 +128,7 @@ There was some confusion about which files to consolidate. Here’s the plan:
 
 ---
 
-## **Summary of Next Steps**
-
-1. **Placeholder Update:**  
-   - Change the filler value in manual_load.py to `"NSN"` for inactive periods when only specific periods are off.
-
-2. **Module Consolidation:**  
-   - Create **daily_utils.py** to house shared functionality from cleandailycov.py (and any overlapping code from dashboard.py).
-   - Update **dashboard.py** to call these shared functions.
-   - Remove redundant code from cleandailycov.py and, if applicable, update_google_sheets.py remains separate.
-
-3. **Simplify the Web Interface:**  
-   - Use **dashboard.py** as the centralized Flask app.
-   - Implement UI/UX enhancements using **Bootstrap** (or a similar framework) for responsive design and dynamic form behavior.
-
+D
 4. **Security and Hosting:**  
    - Secure the web interface with HTTPS and possibly basic authentication.
    - Choose a hosting provider (recommendation: Heroku for ease of use, with Render as an alternative).

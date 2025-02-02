@@ -1,0 +1,189 @@
+Below is a comprehensive summary of the project, its current functionality, what remains to be done, and detailed descriptions of each script’s role in the overall workflow. This summary is designed so that in any future conversation, all necessary context is provided upfront.
+
+---
+
+## **Project Overview**
+
+**Purpose:**  
+The project is a teacher absence tracking system that automates and streamlines the process of updating daily coverage information using Google Sheets. It integrates automated updates, data cleaning/formatting, and manual absence entries via a web interface. Ultimately, the system serves to ease the administrative burden by ensuring that teacher absences and substitute coverage are accurately reflected in a central Google Sheet.
+
+**Key Functions:**
+- **Automated Update:**  
+  Reads data from a daily report, cleans teacher and substitute names, uses fuzzy matching against a master schedule, and updates a “daily coverage” sheet.
+  
+- **Data Cleaning & Formatting:**  
+  Processes the daily coverage sheet to standardize names, sort data, and apply cell formatting (such as filling certain cells with a dark-gray background). This includes replacing non-active period values with a placeholder.
+  
+- **Manual Absence Entry:**  
+  Provides a web form for entering teacher absences manually. Depending on the absence type (Full Day, Half Day AM, Half Day PM, or specific Periods), the system copies parts of the master schedule into the daily coverage sheet. In cases where a teacher is off only for selected periods, the remaining (inactive) periods are filled with the placeholder `"NSN"` (meaning “no sub needed”).
+
+- **Web Dashboard Interface:**  
+  A centralized Flask-based web application that lets users trigger automated updates, cleaning/formatting, and manual absence entries—all through a user-friendly GUI.
+
+---
+
+## **What the Project Does**
+
+1. **Automated Data Processing:**  
+   - **update_google_sheets.py** reads the daily report, cleans the data, and uses fuzzy matching with the master schedule to populate the daily coverage sheet.
+
+2. **Data Cleaning and Formatting:**  
+   - **cleandailycov.py** loads the daily coverage data into a DataFrame, cleans teacher/substitute names, sorts the data, and applies formatting (such as dark-gray background for specific target values).  
+   - (This functionality is planned to be merged with the web dashboard’s functionality for simplicity.)
+
+3. **Manual Absence Handling:**  
+   - **manual_load.py** supports manual entries where a teacher’s absence is recorded by selecting a duration (Full Day, Half Day AM, Half Day PM, or specific Periods).  
+   - The code sets a placeholder for inactive periods. The requirement is to change the placeholder from `"4"` to `"NSN"` when only specific periods are off (i.e., when not a full or half day).
+
+4. **Centralized Web Interface:**  
+   - **dashboard.py** currently serves as the web dashboard, offering routes for automated updates, cleaning/formatting, and manual absence entry. Flask application.
+
+---
+
+
+5. **Security Enhancements:**
+   - Secure the Flask application by serving it over HTTPS.
+   - Consider adding basic authentication (username/password or similar) to restrict access, even though only 2–3 users will be interacting with the system.
+
+6. **Hosting Decisions:**
+   - Evaluate hosting options (Heroku is recommended for its ease of deployment and robust free tier; Render is a good alternative if fewer cold starts are desired).
+   - Finalize the deployment strategy with attention to secure credential management (using environment variables, for example).
+
+7. **Additional Code Refactoring:**
+   - Remove redundant code from **cleandailycov.py** and **update_google_sheets.py** if applicable by migrating common routines into **daily_utils.py**.
+   - Maintain clear, modular functions to ease future testing and maintenance.
+
+---
+
+## **Script-by-Script Detailed Structure & Workflow**
+
+### **1. update_google_sheets.py**
+- **Purpose:**  
+  Performs the automated update process. It:
+  - Reads the daily report from Google Sheets.
+  - Cleans teacher and substitute names.
+  - Uses fuzzy matching (with a threshold of ~85) to match teachers against the master schedule.
+  - Populates the daily coverage sheet with the teacher’s schedule (including a header row and data rows).
+- **Place in Workflow:**  
+  This script is typically run either manually from the command line or triggered via the web dashboard to keep the daily coverage sheet updated automatically.
+
+### **2. manual_load.py**
+- **Purpose:**  
+  Enables manual entry of teacher absences. Based on the chosen duration (Full Day, Half Day AM, Half Day PM, or specific Periods), it:
+  - Retrieves the teacher’s schedule from the master schedule.
+  - Copies the relevant portions into a new row in the daily coverage sheet.
+  - Fills inactive periods with a placeholder—now updated to `"NSN"` for cases where only specific periods are off.
+- **Place in Workflow:**  
+  This script is linked to a form in the Flask web interface, allowing administrators to manually enter absence data as needed.
+
+### **3. cleandailycov.py**
+- **Purpose:**  
+  Cleans and formats the data in the daily coverage sheet. Its functions include:
+  - Converting the sheet data into a pandas DataFrame.
+  - Cleaning teacher names and substitute names.
+  - Sorting the data so that teachers with valid schedules are prioritized.
+  - Applying a dark-gray background to specific cells (e.g., those marked with “Prep”, “Plan/Duty”, “NSN”, etc.).
+- **Place in Workflow:**  
+  Originally a standalone script for cleaning data, its core functionality will be merged into a shared module (daily_utils.py) to be called by the central dashboard.
+
+### **4. dashboard.py**
+- **Purpose:**  
+  Acts as the central web interface (Flask application) for the system. It provides:
+  - Routes to trigger the automated update (calling functions from update_google_sheets.py or the shared module).
+  - Routes to perform cleaning/formatting of the daily coverage data (currently similar to cleandailycov.py, but planned to be refactored into daily_utils.py).
+  - A form for manual absence entry that calls the functions from manual_load.py.
+- **Place in Workflow:**  
+  This is the main point of user interaction. It consolidates all web GUI functionality into one application and will eventually rely on the shared module (daily_utils.py) for its backend logic.
+
+### **5. app.py**
+- **Purpose:**  
+  An older version of the Flask application.
+- **Place in Workflow:**  
+  It was used earlier to provide a web interface but is now considered redundant. Its functionality is (or will be) fully covered by the updated **dashboard.py**. Once confirmed, **app.py** can be safely removed from the codebase.
+
+### **6. Proposed daily_utils.py (Shared Utility Module)**
+- **Purpose:**  
+  To consolidate the common functions from **cleandailycov.py** and parts of **dashboard.py** (and possibly parts of update_google_sheets.py if they share similar operations) into one module. Functions will include:
+  - Reading data from Google Sheets.
+  - Cleaning and standardizing teacher/substitute names.
+  - Sorting and updating the daily coverage data.
+  - Applying cell formatting (e.g., dark-gray fill for target values).
+- **Place in Workflow:**  
+  This module will be imported by the centralized dashboard (dashboard.py) and potentially by other scripts if needed, ensuring that common functionality is maintained in one place for easier updates and testing.
+
+Work to Be Completed:
+5. **Security Enhancements:**
+   - Secure the Flask application by serving it over HTTPS.
+   - Consider adding basic authentication (username/password or similar) to restrict access, even though only 2–3 users will be interacting with the system.
+
+6. **Hosting Decisions:**
+   - Set up and launch Heroic as the hosting option.
+   - Finalize the deployment strategy with attention to secure credential management (using environment variables, for example).
+
+
+Project File Structure:
+(venv) bmcmanus@DDE-990AP-T12 teacher-absence-tracking % tree -I venv
+.
+├── README.md
+├── __pycache__
+│   └── app.cpython-311.pyc
+├── app
+│   ├── __init__.py
+│   ├── __pycache__
+│   │   ├── daily_utils.cpython-311.pyc
+│   │   ├── manual_load.cpython-311.pyc
+│   │   └── update_google_sheets.cpython-311.pyc
+│   ├── credentials.json
+│   ├── daily_utils.py
+│   ├── dashboard.py
+│   ├── manual_load.py
+│   ├── templates
+│   │   ├── dashboard.html
+│   │   ├── index.html
+│   │   ├── manual.html
+│   │   └── report.html
+│   └── update_google_sheets.py
+├── data
+│   ├── Aesop - Daily Report.csv
+│   ├── Aesop - Daily Report.pdf
+│   ├── daily_coverage.csv
+│   ├── extracted_absences.csv
+│   ├── master_schedule - sheet1 (1).csv
+│   ├── s2_t_sched.csv
+│   ├── sub_pdf1.workflow
+│   │   └── Contents
+│   │       ├── Info.plist
+│   │       ├── QuickLook
+│   │       │   └── Preview.png
+│   │       └── document.wflow
+│   ├── sub_pdf_1_convert.py
+│   └── teacher_list.csv
+├── drop
+│   └── Aesop - Daily Report.pdf
+├── project descriptions
+│   ├── Automating Daily Report Download & Google Sheets Integration.txt
+│   ├── Sub Start Process - Rough Version - Nearly Complete 2:1:25.txt
+│   ├── Sub_Start - Summary next steps 2:1:25 16:00.txt
+│   ├── Sub_Start - post-consolidations - next steps.txt
+│   ├── Sub_start - change credentials, lamba refract, flask redirect..txt
+│   ├── Sub_start - project complete save host 2:1:25 23:11.txt
+│   ├── sub Check description.txt
+│   ├── sub_start _ scripts - updated 2:1 - n:16:48.txt
+│   ├── sub_start_scripts_2.1.25.txt
+│   └── updated manual_load by Chat GPT 2.1.25 16:42.rtf
+└── requirements.txt
+
+Work Completed:
+## **Summary of Next Steps**
+
+1. **Placeholder Update:**  
+   - Change the filler value in manual_load.py to `"NSN"` for inactive periods when only specific periods are off.
+
+2. **Module Consolidation:**  
+   - Create **daily_utils.py** to house shared functionality from cleandailycov.py (and any overlapping code from dashboard.py).
+   - Update **dashboard.py** to call these shared functions.
+   - Remove redundant code from cleandailycov.py and, if applicable, update_google_sheets.py remains separate.
+
+3. **Simplify the Web Interface:**  
+   - Use **dashboard.py** as the centralized Flask app.
+   - Implement UI/UX enhancements using **Bootstrap** (or a similar framework) for responsive design and dynamic form behavior.
